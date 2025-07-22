@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <sys/select.h>
 #include <cctype> // Required for toupper
+#include <unordered_map> // For key-value store
 
 // Function to handle communication with a single client
 // void handle_client(int client_fd) {
@@ -160,6 +161,8 @@ int main(int argc, char **argv) {
 
  // 5. Track all active client sockets
  std::vector<int> client_fds;
+ // Key-value store for SET/GET
+ std::unordered_map<std::string, std::string> kv_store;
 
  // 6. Main event loop
 while (true) {
@@ -220,7 +223,25 @@ while (true) {
                         std::string arg = parts[1];
                         std::string respond = "$" + std::to_string(arg.size()) + "\r\n" + arg + "\r\n";
                         write(fd, respond.c_str(), respond.size());
-                    } else {
+                    } else if(command == "SET" && parts.size() >= 3){
+                        std::string key = parts[1];
+                        std::string value = parts[2];
+                        kv_store[key] = value;
+                        std::string respond = "+OK\r\n";
+                        write(fd, respond.c_str(), respond.size());
+                    } else if(command == "GET" && parts.size() >= 2){
+                        std::string key = parts[1];
+                        auto it = kv_store.find(key);
+                        if (it != kv_store.end()) {
+                            const std::string& value = it->second;
+                            std::string respond = "$" + std::to_string(value.size()) + "\r\n" + value + "\r\n";
+                            write(fd, respond.c_str(), respond.size());
+                        } else {
+                            std::string respond = "$-1\r\n";
+                            write(fd, respond.c_str(), respond.size());
+                        }
+                    }
+                    else {
                         // Unknown command, send error
                         std::string respond = "-ERR unknown command\r\n";
                         write(fd, respond.c_str(), respond.size());
